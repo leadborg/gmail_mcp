@@ -46,7 +46,7 @@ Run the server once manually to trigger the OAuth browser flow:
 python gmail_mcp.py
 ```
 
-This creates a `token.json` file next to `gmail_mcp.py`. Subsequent runs reuse and auto-refresh this token.
+This creates a `token.json` file at `~/.config/gmail-mcp/token.json`. Subsequent runs reuse and auto-refresh this token.
 
 ## Running the server
 
@@ -77,10 +77,10 @@ MCP_TRANSPORT=sse python gmail_mcp.py
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MCP_TRANSPORT` | `stdio` | Transport mode: `stdio`, `sse`, `streamable-http` (alias: `http`) |
-| `MCP_HOST` | `0.0.0.0` | Host for HTTP/SSE transports |
+| `MCP_HOST` | `127.0.0.1` | Host for HTTP/SSE transports |
 | `MCP_PORT` | `8001` | Port for HTTP/SSE transports |
-| `GOOGLE_CREDS_PATH` | `google_creds.json` (next to `gmail_mcp.py`) | Path to OAuth client credentials file |
-| `GOOGLE_TOKEN_PATH` | `token.json` (next to `gmail_mcp.py`) | Path to cached OAuth token file |
+| `GOOGLE_CREDS_PATH` | `~/.config/gmail-mcp/google_creds.json` | Path to OAuth client credentials file |
+| `GOOGLE_TOKEN_PATH` | `~/.config/gmail-mcp/token.json` | Path to cached OAuth token file |
 
 ## Claude Desktop configuration
 
@@ -112,12 +112,18 @@ gmail-mcp/
 ├── gmail_mcp.py        # MCP server and tool definitions
 ├── main.py             # Alternate entry point (HTTP transport)
 ├── pyproject.toml
-├── google_creds.json   # OAuth client credentials (not committed)
-├── token.json          # Cached OAuth token (generated at runtime)
 └── tests/
     └── test_gmail_mcp.py
+
+~/.config/gmail-mcp/
+├── google_creds.json   # OAuth client credentials (not committed)
+└── token.json          # Cached OAuth token (generated at runtime)
 ```
 
 ## Permissions
 
-The server requests the `https://www.googleapis.com/auth/gmail.modify` scope, which allows reading and sending email but not deleting messages permanently.
+The server requests two OAuth scopes:
+- `https://www.googleapis.com/auth/gmail.readonly` — read access to emails
+- `https://www.googleapis.com/auth/gmail.send` — permission to send email
+
+This does not grant access to delete messages permanently.
