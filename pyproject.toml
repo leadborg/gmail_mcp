@@ -1,7 +1,7 @@
 [project]
 name = "gmail-mcp"
 version = "0.1.0"
-description = "Add your description here"
+description = "Gmail MCP server"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -11,3 +11,9 @@ dependencies = [
     "google-auth>=2.48.0",
     "google-auth-oauthlib>=1.2.4",
 ]
+
+[project.scripts]
+gmail-mcp = "gmail_mcp:mcp.run"
+
+[tool.setuptools]
+py-modules = ["gmail_mcp"]
