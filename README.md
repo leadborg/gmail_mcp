@@ -11,6 +11,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server that ex
 | `read_email` | Read a specific email by message ID |
 | `read_emails_from_sender` | Fetch recent emails from a specific sender |
 | `reply_email` | Reply to an email, preserving thread headers |
+| `forward_recent_replies_to_webhook` | Forward recent Gmail replies to a signed LeadBorg email webhook |
 
 ## Requirements
 
@@ -127,3 +128,19 @@ The server requests two OAuth scopes:
 - `https://www.googleapis.com/auth/gmail.send` — permission to send email
 
 This does not grant access to delete messages permanently.
+
+## LeadBorg integration notes
+
+When using this server from LeadBorg, configure the email MCP endpoint as:
+
+```text
+http://localhost:8001/mcp/
+```
+
+Set the provider to `gmail-mcp`. LeadBorg will pass a signed `reply_to` alias to
+`send_email`; Gmail-MCP writes it as the `Reply-To` header so inbound replies can
+be correlated back to the lead.
+
+For local reply ingestion, run the `forward_recent_replies_to_webhook` tool with
+the LeadBorg webhook URL (`/api/webhooks/email/mcp`) and the same signing secret
+configured as `EMAIL_WEBHOOK_SIGNING_SECRET`.
