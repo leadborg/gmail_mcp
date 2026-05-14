@@ -335,10 +335,13 @@ class GmailMcpTests(unittest.TestCase):
     def test_respond_to_event_sets_response_status(self):
         existing = self._make_calendar_event("evt-1", "Invite")
         existing["attendees"] = [
-            {"email": "me@example.com", "responseStatus": "needsAction"},
+            {"email": "me@example.com", "responseStatus": "needsAction", "self": True},
         ]
         service = MagicMock()
         service.events.return_value.get.return_value.execute.return_value = existing
+        service.calendarList.return_value.get.return_value.execute.return_value = {
+            "id": "me@example.com"
+        }
 
         with patch.object(gmail_mcp, "get_calendar_service", return_value=service):
             result = gmail_mcp.respond_to_event("primary", "evt-1", "accepted")

@@ -175,7 +175,7 @@ def _handle_tool_error(operation: str, exc: Exception) -> dict[str, Any]:
 # -------------------------
 # AUTHENTICATION
 # -------------------------
-def get_gmail_service():
+def _get_credentials():
     token_path = _resolve_config_path("GOOGLE_TOKEN_PATH", "token.json")
     creds_path = _resolve_config_path("GOOGLE_CREDS_PATH", "google_creds.json")
     creds = None
@@ -183,7 +183,8 @@ def get_gmail_service():
     if token_path.exists():
         creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
 
-    if not creds or not creds.valid:
+    needs_new_token = not creds or not creds.valid or not set(SCOPES).issubset(set(creds.scopes or []))
+    if needs_new_token:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
@@ -200,35 +201,15 @@ def get_gmail_service():
         token_path.write_text(creds.to_json(), encoding="utf-8")
         token_path.chmod(0o600)
 
-    return build("gmail", "v1", credentials=creds)
+    return creds
+
+
+def get_gmail_service():
+    return build("gmail", "v1", credentials=_get_credentials())
 
 
 def get_calendar_service():
-    token_path = _resolve_config_path("GOOGLE_TOKEN_PATH", "token.json")
-    creds_path = _resolve_config_path("GOOGLE_CREDS_PATH", "google_creds.json")
-    creds = None
-
-    if token_path.exists():
-        creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            if not creds_path.exists():
-                raise FileNotFoundError(
-                    f"Google OAuth credentials file not found at {creds_path}"
-                )
-            flow = InstalledAppFlow.from_client_secrets_file(
-                str(creds_path), SCOPES
-            )
-            creds = flow.run_local_server(port=0)
-
-        token_path.parent.mkdir(parents=True, exist_ok=True)
-        token_path.write_text(creds.to_json(), encoding="utf-8")
-        token_path.chmod(0o600)
-
-    return build("calendar", "v3", credentials=creds)
+    return build("calendar", "v3", credentials=_get_credentials())
 
 
 # -------------------------
@@ -813,20 +794,37 @@ def respond_to_event(calendar_id: str, event_id: str, response_status: str):
         service = get_calendar_service()
         event = service.events().get(calendarId=calendar_id, eventId=event_id).execute()
 
+        # Get the user's email from the primary calendar for matching
+        user_email = None
+        try:
+            cal = service.calendarList().get(calendarId="primary").execute()
+            user_email = cal.get("id")
+        except Exception:
+            pass
+
         attendees = event.get("attendees", [])
-        if not attendees:
-            # No attendees; add one for the current user
-            attendees = [{"email": "me", "responseStatus": clean_status}]
-        else:
-            # Update the first attendee whose responseStatus is not yet set or is "needsAction"
-            updated = False
+
+        # Find the attendee that represents the current user
+        target = None
+        for attendee in attendees:
+            if attendee.get("self"):
+                target = attendee
+                break
+
+        if target is None and user_email:
             for attendee in attendees:
-                if attendee.get("responseStatus", "needsAction") == "needsAction":
-                    attendee["responseStatus"] = clean_status
-                    updated = True
+                if attendee.get("email", "").lower() == user_email.lower():
+                    target = attendee
                     break
-            if not updated and attendees:
-                attendees[0]["responseStatus"] = clean_status
+
+        if target is not None:
+            target["responseStatus"] = clean_status
+        else:
+            # No matching attendee found; add one for the current user
+            attendee_entry = {"responseStatus": clean_status}
+            if user_email:
+                attendee_entry["email"] = user_email
+            attendees.append(attendee_entry)
 
         event["attendees"] = attendees
         service.events().update(calendarId=calendar_id, eventId=event_id, body=event).execute()
